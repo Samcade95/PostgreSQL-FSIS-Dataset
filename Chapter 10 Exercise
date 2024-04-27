@@ -1,0 +1,273 @@
+CREATE TABLE meat_poultry_egg_establishments (
+    establishment_number text CONSTRAINT est_number_key PRIMARY KEY,
+    company text,
+    street text,
+    city text,
+    st text,
+    zip text,
+    phone text,
+    grant_date date,
+    activities text,
+    dbas text
+);
+
+**Here is where you create the inital table for the relational database that we are building in PostgreSQL**
+
+COPY meat_poultry_egg_establishments
+FROM 'C:\YourDirectory\MPI_Directory_by_Establishment_Name.csv'
+WITH (FORMAT CSV, HEADER);
+
+**Here we use the COPY command in SQL to copy the CSV File from Excel over to our table that we created in the first lines above**
+
+CREATE INDEX company_idx ON meat_poultry_egg_establishments (company);
+
+**Here we use the INDEX command to create an index on the large dataset we imported, this decreases the time it takes the data to display within our table**
+
+SELECT count(*) FROM meat_poultry_egg_establishments;
+
+**Here we use the SELECT command followed by the count(*) aggregate function to check the rows in the table we created**
+
+SELECT company,
+       street,
+       city,
+       st,
+       count(*) AS address_count
+FROM meat_poultry_egg_establishments
+GROUP BY company, street, city, st
+HAVING count(*) > 1
+ORDER BY company, street, city, st;
+
+**Here we group companies by the unique combinations of the company, street, city, and st columns, we filter using the HAVING command with count(*), to show only cases where more than one row has the same combo**
+
+SELECT st, 
+       count(*) AS st_count
+FROM meat_poultry_egg_establishments
+GROUP BY st
+ORDER BY st;
+
+**Here we use count(*) to tally the number of times each state postal code (st) appears in the table**
+
+SELECT establishment_number,
+       company,
+       city,
+       st,
+       zip
+FROM meat_poultry_egg_establishments
+WHERE st IS NULL;
+
+**Here we add a WHERE clause with the st column and the IS NULL command to find which rows are missing a state code**
+
+SELECT company,
+       count(*) AS company_count
+FROM meat_poultry_egg_establishments
+GROUP BY company
+ORDER BY company ASC;
+
+**Here we check for inconsistently entered data within a column by using the GROUP BY command with count(*)**
+
+SELECT length(zip),
+       count(*) AS length_count
+FROM meat_poultry_egg_establishments
+GROUP BY length(zip)
+ORDER BY length(zip) ASC;
+
+**Here we determine how many rows have five characters in the zip field, and how many have a value other than five by using the length() string function**
+**We make it easier to scan the results by using length() with an ORDER BY clause**
+
+SELECT st,
+       count(*) AS st_count
+FROM meat_poultry_egg_establishments
+WHERE length(zip) < 5
+GROUP BY st
+ORDER BY st ASC;
+
+**Here we use the length function inside the WHERE clause to return a count of rows, where the ZIP code is less than 5 characters for each state code**
+
+CREATE TABLE meat_poultry_egg_establishments_backup AS
+SELECT * FROM meat_poultry_egg_establishments;
+
+**Here we create a backup table from our original table, and then we check to make sure all the rows and columns imported correctly**
+
+SELECT 
+    (SELECT count(*) FROM meat_poultry_egg_establishments) AS original,
+    (SELECT count(*) FROM meat_poultry_egg_establishments_backup) AS backup;
+
+**Here we check the number of records in both the original table and the backup table**
+
+ALTER TABLE meat_poultry_egg_establishments ADD COLUMN st_copy text;
+
+UPDATE meat_poultry_egg_establishments
+SET st_copy = st;
+
+**Here we alter the original table and then add a column to the table via the ALTER TABLE command and the ADD COLUMN command**
+**We also use the UPDATE command to update the original table to reflect these changes**
+**Finally we use the SET command to change the column st_copy, to st within the table**
+
+SELECT st,
+       st_copy
+FROM meat_poultry_egg_establishments
+WHERE st IS DISTINCT FROM st_copy
+ORDER BY st;
+
+**Here we check the differences between values in the columns using a WHERE clause and IS DISTINCT FROM, which tests whether values in st and st_copy are different**
+
+UPDATE meat_poultry_egg_establishments
+SET st = 'MN'
+WHERE establishment_number = 'V18677A';
+
+UPDATE meat_poultry_egg_establishments
+SET st = 'AL'
+WHERE establishment_number = 'M45319+P45319';
+
+UPDATE meat_poultry_egg_establishments
+SET st = 'WI'
+WHERE establishment_number = 'M263A+P263A+V263A'
+RETURNING establishment_number, company, city, st, zip;
+
+**Here we update the state column by adding these states to their appropriate rows, this updates those rows missing values**
+**We update each statement to affect a single row, by using a WHERE clause**
+
+UPDATE meat_poultry_egg_establishments
+SET st = st_copy;
+
+**Here we use the UPDATE command to update our original table, and the SET command to change the st column to st_copy**
+**This restores the values from the backup column in the original table**
+
+UPDATE meat_poultry_egg_establishments original
+SET st = backup.st
+FROM meat_poultry_egg_establishments_backup backup
+WHERE original.establishment_number = backup.establishment_number; 
+
+**This is how we can restore from the table backup, and set st to values in the st column from the backup table that was created**
+
+ALTER TABLE meat_poultry_egg_establishments ADD COLUMN company_standard text;
+
+**Here we create a new column for the standardized spellings, we name this column company_standard and set it as a text data type**
+
+UPDATE meat_poultry_egg_establishments
+SET company_standard = company;
+
+**Here we update our original table and change the name of the company_standard table to company**
+
+UPDATE meat_poultry_egg_establishments
+SET company_standard = 'Armour-Eckrich Meats'
+WHERE company LIKE 'Armour%'
+RETURNING company, company_standard;
+
+**Here we update all the rows matching the string Armour, using a WHERE clause**
+**We then use a RETURNING clause to have the statement provide the results of the updated company_standard column next to the original company column**
+
+ALTER TABLE meat_poultry_egg_establishments ADD COLUMN zip_copy text;
+
+**Here we use the ALTER TABLE command and the ADD COLUMN command, to add a new column with a text data type named zip_copy**
+
+UPDATE meat_poultry_egg_establishments
+SET zip_copy = zip;
+
+**Here we use the UPDATE command to update the original table, and then use the SET command to change the column zip_copy to zip**
+
+UPDATE meat_poultry_egg_establishments
+SET zip = '00' || zip
+WHERE st IN('PR','VI') AND length(zip) = 3;
+
+**Here we perform an update via the UPDATE command on the first table, use the SET command to set the value in the zip column to the result of 00 and an existing value**
+**We also limit the update to only those rows where the st column has the state codes PR and VI, and we also add a test for rows where the length of zip is 3**
+
+UPDATE meat_poultry_egg_establishments
+SET zip = '0' || zip
+WHERE st IN('CT','MA','ME','NH','NJ','RI','VT') AND length(zip) = 4;
+
+**Here we perform similar operations like in our previous lines of code, however we set the value in the zip column to the result of 0, and we limit the update to only those rows where the st column has the state codes CT, MA, ME, NH, NJ, RI, and VT**
+**We also add a test for rows where the length of zip is 4**
+
+CREATE TABLE state_regions (
+    st text CONSTRAINT st_key PRIMARY KEY,
+    region text NOT NULL
+);
+
+**Here we create a new table called state_regions and set its Primary Key via the PRIMARY KEY command to st_key**
+**We also create a NOT NULL constraint for the column region**
+
+COPY state_regions
+FROM 'C:\YourDirectory\state_regions.csv'
+WITH (FORMAT CSV, HEADER);
+
+**Here we copy a large dataset via an Excel CSV from the C: path on a computer, to the newley created table we just made**
+
+ALTER TABLE meat_poultry_egg_establishments
+    ADD COLUMN inspection_deadline timestamp with time zone;
+
+**Here we use the ALTER TABLE command and the ADD COLUMN command on the original table to add the column inspection_deadline to the meat_poultry_egg_establishments table**
+
+UPDATE meat_poultry_egg_establishments establishments
+SET inspection_deadline = '2022-12-01 00:00 EST'
+WHERE EXISTS (SELECT state_regions.region
+              FROM state_regions
+              WHERE establishments.st = state_regions.st 
+                    AND state_regions.region = 'New England');
+
+**Here we use the UPDATE command to give the table an alias of establishments, which makes the code easier to read, we also use the SET command to assign a timestamp value to the new column we created in the previous lines of code**
+**We use the WHERE EXISTS command to connect the two tables together via a subquery, this also specifies which rows to update as well**
+
+SELECT st, inspection_deadline
+FROM meat_poultry_egg_establishments
+GROUP BY st, inspection_deadline
+ORDER BY st;
+
+**Here we use these commands to view the updated inspection deadlines for all New England companies**
+
+DELETE FROM meat_poultry_egg_establishments
+WHERE st IN('AS','GU','MP','PR','VI');
+
+**Here we use the DELETE FROM command to delete data from this table**
+**We then use a WHERE clause to exclude the selected US territories in the ()**
+
+ALTER TABLE meat_poultry_egg_establishments DROP COLUMN zip_copy;
+
+**Here we use the ALTER TABLE command and the DROP COLUMN command to alter this table, and remove the zip_copy column from the table**
+
+DROP TABLE meat_poultry_egg_establishments_backup;
+
+**Here we use the DROP TABLE command to delete the table named meat_poultry_egg_establishments_backup**
+
+START TRANSACTION;
+
+UPDATE meat_poultry_egg_establishments
+SET company = 'AGRO Merchantss Oakland LLC'
+WHERE company = 'AGRO Merchants Oakland, LLC';
+
+**Here we use the START TRANSACTION command to make sure that any changes made to the data will not be made permanent unless we issue a COMMIT command**
+**We then run an update statement, and introduce a mistake to the column**
+
+SELECT company
+FROM meat_poultry_egg_establishments
+WHERE company LIKE 'AGRO%'
+ORDER BY company;
+
+**When we view the names of companies starting with ARGO using the SELECT statement, we will see that one company name is misspelled now**
+
+ROLLBACK;
+
+**Here we use the ROLLBACK command to discard the changes made to the companies**
+
+CREATE TABLE meat_poultry_egg_establishments_backup AS
+SELECT *,
+       '2023-02-14 00:00 EST'::timestamp with time zone AS reviewed_date
+FROM meat_poultry_egg_establishments;
+
+**Here we copy the table meat_poultry_egg_establishments_backup into a new table while adding a populated column**
+**We also add a column named reviewed_date by providing a value cast as a timestamp data type**
+
+ALTER TABLE meat_poultry_egg_establishments 
+    RENAME TO meat_poultry_egg_establishments_temp;
+ALTER TABLE meat_poultry_egg_establishments_backup 
+    RENAME TO meat_poultry_egg_establishments;
+ALTER TABLE meat_poultry_egg_establishments_temp 
+    RENAME TO meat_poultry_egg_establishments_backup;
+
+**Here we use the ALTER TABLE command and the RENAME TO command on these tables to change the names on them**
+
+**This was a fun project all together, feel free to give it a try and test out your PostgreSQL skills :)**
+**Sources used Chapter 10 Exercise from the book "Practical SQL: A Beginner's Guide To Storytelling With Data", Author: Anthony DeBarros**
+
+
